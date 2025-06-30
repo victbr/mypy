@@ -107,7 +107,7 @@ def find_module_path_using_sys_path(module: str, sys_path: list[str]) -> str | N
 
 
 def find_module_path_and_all_py3(
-    inspect: ModuleInspect, module: str, verbose: bool
+    inspect: ModuleInspect, module: str, preload: list[str], verbose: bool
 ) -> tuple[str | None, list[str] | None] | None:
     """Find module and determine __all__ for a Python 3 module.
 
@@ -122,7 +122,7 @@ def find_module_path_and_all_py3(
     if verbose:
         print(f"Trying to import {module!r} for runtime introspection")
     try:
-        mod = inspect.get_package_properties(module)
+        mod = inspect.get_package_properties(module, preload)
     except InspectError as e:
         # Fall back to finding the module using sys.path.
         path = find_module_path_using_sys_path(module, sys.path)

@@ -214,6 +214,7 @@ class Options:
         quiet: bool,
         export_less: bool,
         include_docstrings: bool,
+        preload_modules: list[str],
     ) -> None:
         # See parse_options for descriptions of the flags.
         self.pyversion = pyversion
@@ -234,6 +235,7 @@ class Options:
         self.quiet = quiet
         self.export_less = export_less
         self.include_docstrings = include_docstrings
+        self.preload_modules = preload_modules
 
 
 class StubSource:
@@ -1584,7 +1586,7 @@ def collect_build_targets(
         else:
             # Using imports is the default, since we can also find C modules.
             py_modules, c_modules = find_module_paths_using_imports(
-                options.modules, options.packages, options.verbose, options.quiet
+                options.modules, options.packages, options.preload_modules, options.verbose, options.quiet
             )
     else:
         # Use mypy native source collection for files and directories.
@@ -1601,7 +1603,7 @@ def collect_build_targets(
 
 
 def find_module_paths_using_imports(
-    modules: list[str], packages: list[str], verbose: bool, quiet: bool
+    modules: list[str], packages: list[str], preload: list[str], verbose: bool, quiet: bool
 ) -> tuple[list[StubSource], list[StubSource]]:
     """Find path and runtime value of __all__ (if possible) for modules and packages.
 
@@ -1617,7 +1619,7 @@ def find_module_paths_using_imports(
         ]  # We don't want to run any tests or scripts
         for mod in modules:
             try:
-                result = find_module_path_and_all_py3(inspect, mod, verbose)
+                result = find_module_path_and_all_py3(inspect, mod, preload, verbose)
             except CantImport as e:
                 tb = traceback.format_exc()
                 if verbose:
@@ -1871,6 +1873,7 @@ def generate_stubs(options: Options) -> None:
                 target,
                 known_modules=all_module_names,
                 doc_dir=options.doc_dir,
+                preload=options.preload_modules,
                 include_private=options.include_private,
                 export_less=options.export_less,
                 include_docstrings=options.include_docstrings,
@@ -1999,6 +2002,12 @@ def parse_options(args: list[str]) -> Options:
     parser.add_argument(
         "--version", action="version", version="%(prog)s " + mypy.version.__version__
     )
+    parser.add_argument(
+        "--preload", 
+        nargs='+', 
+        default=[],
+        help='Preload the specified modules.'
+    )
 
     ns = parser.parse_args(args)
 
@@ -2033,6 +2042,7 @@ def parse_options(args: list[str]) -> Options:
         quiet=ns.quiet,
         export_less=ns.export_less,
         include_docstrings=ns.include_docstrings,
+        preload_modules=ns.preload,
     )
 
 
@@ -2042,6 +2052,7 @@ def main(args: list[str] | None = None) -> None:
     # stubgen can be run on packages in the current directory.
     if not ("" in sys.path or "." in sys.path):
         sys.path.insert(0, "")
+
 
     options = parse_options(sys.argv[1:] if args is None else args)
     generate_stubs(options)

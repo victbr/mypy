@@ -47,9 +47,11 @@ class InspectError(Exception):
     pass
 
 
-def get_package_properties(package_id: str) -> ModuleProperties:
+def get_package_properties(package_id: str, preload_modules: list[str] = []) -> ModuleProperties:
     """Use runtime introspection to get information about a module/package."""
     try:
+        for preload_module in preload_modules:
+            importlib.import_module(preload_module)
         package = importlib.import_module(package_id)
     except BaseException as e:
         raise InspectError(str(e)) from e
@@ -94,9 +96,9 @@ def worker(tasks: Queue[str], results: Queue[str | ModuleProperties], sys_path: 
     """The main loop of a worker introspection process."""
     sys.path = sys_path
     while True:
-        mod = tasks.get()
+        mod, preload = tasks.get()
         try:
-            prop = get_package_properties(mod)
+            prop = get_package_properties(mod, preload)
         except InspectError as e:
             results.put(str(e))
             continue
@@ -137,12 +139,12 @@ class ModuleInspect:
         """Free any resources used."""
         self.proc.terminate()
 
-    def get_package_properties(self, package_id: str) -> ModuleProperties:
+    def get_package_properties(self, package_id: str, preload_modules: list[str] = []) -> ModuleProperties:
         """Return some properties of a module/package using runtime introspection.
 
         Raise InspectError if the target couldn't be imported.
         """
-        self.tasks.put(package_id)
+        self.tasks.put((package_id, preload_modules))
         res = self._get_from_queue()
         if res is None:
             # The process died; recover and report error.
@@ -155,7 +157,7 @@ class ModuleInspect:
                 # corrupted some global state.
                 self.close()
                 self._start()
-                return self.get_package_properties(package_id)
+                return self.get_package_properties(package_id, preload_modules)
             raise InspectError(res)
         self.counter += 1
         return res

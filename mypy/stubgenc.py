@@ -150,6 +150,7 @@ def generate_stub_for_c_module(
     known_modules: list[str],
     doc_dir: str = "",
     *,
+    preload: list[str] = [],
     include_private: bool = False,
     export_less: bool = False,
     include_docstrings: bool = False,
@@ -177,6 +178,7 @@ def generate_stub_for_c_module(
         include_private=include_private,
         export_less=export_less,
         include_docstrings=include_docstrings,
+        preload=preload,
     )
     gen.generate_module()
     output = gen.output()
@@ -234,8 +236,11 @@ class InspectionStubGenerator(BaseStubGenerator):
         export_less: bool = False,
         include_docstrings: bool = False,
         module: ModuleType | None = None,
+        preload: list[str] = [],
     ) -> None:
         self.doc_dir = doc_dir
+        for preload_module in preload:
+            importlib.import_module(preload_module)
         if module is None:
             self.module = importlib.import_module(module_name)
         else:
